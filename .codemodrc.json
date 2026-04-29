@@ -1,0 +1,12 @@
+{
+  "$schema": "https://codemod-utils.s3.us-west-1.amazonaws.com/configuration_schema.json",
+  "engine": "jssg",
+  "name": "web3py-v6-to-v7",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Automate web3.py v6 → v7 migration: rename APIs, snake_case kwargs, ABI type imports, deprecated module flags. Built for the DoraHacks Boring AI hackathon.",
+  "applicability": {
+    "from": [["web3", ">=", "6.0.0"]],
+    "to": [["web3", ">=", "7.0.0"]]
+  }
+}

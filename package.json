@@ -1,0 +1,11 @@
+{
+  "name": "web3py-v6-to-v7",
+  "version": "0.1.0",
+  "description": "Codemod for migrating web3.py v6 → v7 (Boring AI hackathon)",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "codemod jssg test ./src/index.ts --language python --tests-dir ./tests"
+  },
+  "license": "MIT"
+}

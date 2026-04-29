@@ -1,0 +1,12 @@
+version: "1"
+nodes:
+  - id: transform
+    name: web3py-v6-to-v7
+    type: automatic
+    steps:
+      - name: Run JSSG
+        js-ast-grep:
+          js_file: "src/index.ts"
+          language: "python"
+          include:
+            - "**/*.py"

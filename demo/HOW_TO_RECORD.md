@@ -23,9 +23,9 @@ Demo runner: `demo/demo.ps1` (paced for screen recording, ~75 seconds end to end
 ## What the demo shows (to remember during the pitch)
 
 - 0:00–0:10 — title card, v6 source snippet
-- 0:10–0:35 — codemod dry-run diff (the 5 categories of change)
-- 0:35–0:55 — `npm test` showing 11 fixtures pass (6 positive + 5 negative)
-- 0:55–1:15 — closing pitch with the headline numbers
+- 0:10–0:40 — codemod dry-run diff (the 5 categories of change, from the recorded real run)
+- 0:40–1:00 — `npm test` showing 12 fixtures pass (6 positive + 5 negative + 1 mixed)
+- 1:00–1:20 — closing pitch with the headline numbers
 
 ## Upload
 

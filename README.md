@@ -31,7 +31,7 @@ This codemod automates **86%** of that mechanical work with **zero false positiv
 
 ## Methodology: AST node-kind scoping
 
-> **Zero false positives is not a hopeful claim — it is a structural property of the rule definitions.** Every rule's failure mode is "miss" (under-rewrite, surfaces in CI), never "wrong rewrite" (over-rewrite, causes a silent regression).
+> **Zero remaining false positives — a structural property of the rule definitions, validated by field testing.** Every rule's failure mode is "miss" (under-rewrite, surfaces in CI), never "wrong rewrite" (over-rewrite, causes a silent regression). The one exception was a blanket `web3.types` → `eth_typing` import rewrite caught by field testing in v0.1.0; v0.1.2 made it symbol-conditional and added a regression fixture. See [Field test](#field-test).
 
 Most migration tools take one of two failure-prone paths. This codemod takes a third:
 
@@ -45,7 +45,7 @@ Most migration tools take one of two failure-prone paths. This codemod takes a t
 
 | Transformation type | Bound node kind | Why this scoping prevents false positives |
 |---|---|---|
-| Type/class renames | `identifier` with exact name regex | A user-defined variable also named `WebsocketProvider` would only match its single binding site, not unrelated text. |
+| Type/class renames | `identifier` with exact name regex | These names (`WebsocketProvider`, `BlockNumberOutofRange`, `ABIEventFunctionNotFound`, …) are unique to web3.py's public API — no plain Python or third-party class shares these exact identifiers. **Collision risk is statistical, not structural** — `CallOverride` is the one with non-trivial collision potential, mitigated only by name rarity. |
 | Method renames | `attribute` node enclosing the method name | Bare `def encodeABI(...)` in user code is **not** rewritten — only `obj.encodeABI(...)` form is. |
 | Keyword argument renames | `keyword_argument` node inside a `call` | `{"fromBlock": 5}` (an RPC dict literal whose field name **does not change** in v7) is correctly preserved as a string key. |
 | Import path rewrites | `import_from_statement` whose module name matches **and** whose imported symbols all relocated in v7 | `from web3.types import RPCEndpoint` is left alone — only `ABI*` family symbols moved to `eth_typing` in v7. Mixed imports skip rewrite (deliberately conservative). |
@@ -78,6 +78,8 @@ The first run on `web3-proxy-providers` exposed a real false positive that all s
 Test fixture `12-import-rpc-types-preserved` encodes the negative case so the regression cannot return.
 
 This is the kind of bug that would have shipped silently if the codemod's verification had stopped at hand-authored examples. Field testing on real code is what made the "zero false positives" claim true.
+
+**Stated limitation of these field tests**: both repositories exercise the `WebsocketProvider` → `LegacyWebSocketProvider` rename only. Coverage of the other 13 transformation rules (kwargs, `encodeABI` attribute renames, removed-module flagging, `.middlewares` attribute, etc.) rests on the synthetic fixtures and the AST-scoping reasoning in the table above, not on real-world repos. A future v0.2 plans broader field tests against repos that exercise more of v6's API surface.
 
 ---
 

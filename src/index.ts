@@ -44,9 +44,52 @@ const KWARG_RENAMES: Array<[string, string]> = [
 ];
 
 // === D. Module path rewrites for `from X import ...` ===
-const IMPORT_REWRITES: Array<{ from: string; to: string }> = [
-  { from: "web3.types", to: "eth_typing" },
+// Conditional: web3.types -> eth_typing fires ONLY when every imported symbol
+// is one of the ABI_* family that v7 actually relocated. Other symbols
+// (RPCEndpoint, RPCResponse, BlockData, FilterParams, ...) remain in
+// web3.types in v7 and must NOT be rewritten — that would be a real
+// false positive that breaks imports at runtime.
+const ABI_TYPES_MOVED_TO_ETH_TYPING = new Set<string>([
+  "ABI",
+  "ABIElement",
+  "ABIFunction",
+  "ABIEvent",
+  "ABIError",
+  "ABIComponent",
+  "ABIComponentIndexed",
+  "ABIConstructor",
+  "ABIFallback",
+  "ABIReceive",
+  "ABIEventParams",
+  "ABIFunctionParams",
+]);
+const IMPORT_REWRITES: Array<{
+  from: string;
+  to: string;
+  symbolAllowlist: Set<string>;
+}> = [
+  {
+    from: "web3.types",
+    to: "eth_typing",
+    symbolAllowlist: ABI_TYPES_MOVED_TO_ETH_TYPING,
+  },
 ];
+
+// Parse imported names out of an `import_from_statement` text.
+// Handles single-line `from X import A, B`, parenthesized `from X import (A, B,)`,
+// trailing-comma forms, and `as` aliases. Returns the original (pre-`as`) names.
+function extractImportNames(stmtText: string): string[] {
+  const importIdx = stmtText.indexOf("import");
+  if (importIdx < 0) return [];
+  let body = stmtText.slice(importIdx + "import".length).trim();
+  // Strip wrapping parentheses if present.
+  if (body.startsWith("(")) body = body.slice(1);
+  if (body.endsWith(")")) body = body.slice(0, -1);
+  return body
+    .split(",")
+    .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
+    .filter((s) => s.length > 0);
+}
 
 // === F. Attribute renames inside `w3.middlewares` / `w3.middleware` ===
 // In v7 the public attribute moved from `middlewares` to `middleware` (singular).
@@ -109,7 +152,7 @@ const codemod: Codemod<Python> = async (root) => {
     }
   }
 
-  // --- D. Module path rewrites ---
+  // --- D. Module path rewrites (symbol-conditional) ---
   for (const rule of IMPORT_REWRITES) {
     const matches = rootNode.findAll({
       rule: {
@@ -122,6 +165,15 @@ const codemod: Codemod<Python> = async (root) => {
     });
     for (const n of matches) {
       const text = n.text();
+      const names = extractImportNames(text);
+      if (names.length === 0) continue;
+      // Skip wildcard imports — too risky to rewrite without seeing what's used.
+      if (names.includes("*")) continue;
+      // Only rewrite if EVERY imported symbol relocated in v7. Mixed imports
+      // (e.g. ABI plus RPCEndpoint together) would need to be split — not
+      // attempted here, deliberately conservative.
+      const allMoved = names.every((nm) => rule.symbolAllowlist.has(nm));
+      if (!allMoved) continue;
       const replaced = text.replace(
         new RegExp(`from\\s+${escapeRegex(rule.from)}`),
         `from ${rule.to}`,

@@ -38,28 +38,21 @@ Pause-Beat 400
 Write-Host "    $ codemod jssg run --language python ./src/index.ts ./examples --dry-run" -ForegroundColor DarkYellow
 Pause-Beat 1200
 
-# Show a hand-crafted diff snippet (faster than waiting for codemod boot)
-$diff = @(
-    "  -from web3.providers.websocket import WebsocketProvider, WebsocketProviderV2"
-    "  +from web3.providers.websocket import LegacyWebSocketProvider, WebSocketProvider"
-    "  -from web3.types import ABI, ABIEvent, ABIFunction"
-    "  +from eth_typing import ABI, ABIEvent, ABIFunction"
-    "  -        fromBlock=since,"
-    "  +        from_block=since,"
-    "  -    return contract.encodeABI(fn_name='transfer', args=[recipient, amount])"
-    "  +    return contract.encode_abi(abi_element_name='transfer', args=[recipient, amount])"
-    "  -    async for msg in w3.listen_to_websocket():"
-    "  +    async for msg in w3.process_subscriptions():"
-    "  +# TODO(web3py-v7): ``ethpm`` was removed in web3.py v7. Manual rewrite needed."
-    "   import ethpm"
-)
-foreach ($line in $diff) {
-    if ($line -match '^\s*-') { Write-Host $line -ForegroundColor Red }
-    elseif ($line -match '^\s*\+') { Write-Host $line -ForegroundColor Green }
-    else { Write-Host $line -ForegroundColor DarkGray }
-    Start-Sleep -Milliseconds 90
+# Pre-recorded codemod output (`demo/recorded-diff.txt`), replayed line-by-line
+# for demo pacing. To regenerate: see demo/HOW_TO_RECORD.md "Refreshing the diff".
+$diffPath = Join-Path $PSScriptRoot 'recorded-diff.txt'
+$diffLines = Get-Content $diffPath
+foreach ($line in $diffLines) {
+    $rendered = "  " + $line
+    if ($line -match '^\+\+\+|^---') { Write-Host $rendered -ForegroundColor DarkGray }
+    elseif ($line -match '^@@') { Write-Host $rendered -ForegroundColor Magenta }
+    elseif ($line -match '^-') { Write-Host $rendered -ForegroundColor Red }
+    elseif ($line -match '^\+') { Write-Host $rendered -ForegroundColor Green }
+    elseif ($line -match '^={5,}|^File:') { Write-Host $rendered -ForegroundColor DarkCyan }
+    else { Write-Host $rendered -ForegroundColor DarkGray }
+    Start-Sleep -Milliseconds 55
 }
-Pause-Beat 1800
+Pause-Beat 1500
 
 # ── 3. Run the test suite ────────────────────────────────────────
 Show-Header "3.  Test suite — positive AND negative fixtures"

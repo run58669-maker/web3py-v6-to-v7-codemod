@@ -43,3 +43,19 @@ npm test
 ```
 
 Then the recorded run will be cache-hot and not pause to install.
+
+## Refreshing the diff
+
+`demo/recorded-diff.txt` is a real `codemod jssg run --dry-run` output captured
+against `examples/realistic-v6-dapp.py`, with ANSI color codes stripped so the
+demo runner can re-color it consistently. To regenerate after editing the
+codemod or the example:
+
+```bash
+npx codemod jssg run --language python ./src/index.ts \
+    --target ./examples/realistic-v6-dapp.py --dry-run \
+    --allow-dirty --no-interactive 2>&1 \
+  | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' > demo/recorded-diff.txt
+```
+
+The file is regenerable, deterministic, and small enough to commit.

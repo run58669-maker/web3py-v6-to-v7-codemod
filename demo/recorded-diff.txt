@@ -1,0 +1,87 @@
+
+============================================================
+File: ./examples/realistic-v6-dapp.py
+============================================================
+--- [before] ./examples/realistic-v6-dapp.py
++++ [after]  ./examples/realistic-v6-dapp.py
+@@ -6,34 +6,36 @@ typed parameters, websocket subscriptions, and ABI imports.
+ """
+ from web3 import Web3
+-from web3.providers.websocket import WebsocketProvider, WebsocketProviderV2
+-from web3.types import ABI, ABIEvent, ABIFunction
++from web3.providers.websocket import LegacyWebSocketProvider, WebSocketProvider
++from eth_typing import ABI, ABIEvent, ABIFunction
+ from web3.exceptions import (
+-    ABIEventFunctionNotFound,
+-    BlockNumberOutofRange,
++    ABIEventNotFound,
++    BlockNumberOutOfRange,
+ )
+-from web3._utils.method_formatters import CallOverride
++from web3._utils.method_formatters import StateOverride
+ 
++# TODO(web3py-v7): `ethpm` was removed in web3.py v7. Manual rewrite needed.
+ import ethpm  # legacy package manager
++# TODO(web3py-v7): `web3.geth.miner` was removed in web3.py v7. Manual rewrite needed.
+ from web3.geth.miner import set_extra  # deprecated mining API
+ 
+ 
+ def make_legacy_client(url: str) -> Web3:
+-    return Web3(WebsocketProvider(url))
++    return Web3(LegacyWebSocketProvider(url))
+ 
+ 
+ def make_modern_client(url: str) -> Web3:
+-    return Web3(WebsocketProviderV2(url))
++    return Web3(WebSocketProvider(url))
+ 
+ 
+ async def stream_blocks(w3: Web3) -> None:
+     await w3.eth.subscribe("newHeads")
+-    async for msg in w3.listen_to_websocket():
++    async for msg in w3.process_subscriptions():
+         print("new head:", msg)
+ 
+ 
+ def encode_transfer(contract, recipient: str, amount: int) -> bytes:
+-    return contract.encodeABI(fn_name="transfer", args=[recipient, amount])
++    return contract.encode_abi(abi_element_name="transfer", args=[recipient, amount])
+ 
+ 
+ def fetch_logs(w3: Web3, contract, addr: str, since: int):
+@@ -47,8 +49,8 @@ 
+ def build_filter(contract, since: int):
+     return contract.events.Transfer.create_filter(
+-        fromBlock=since,
+-        toBlock="latest",
++        from_block=since,
++        to_block="latest",
+     )
+ 
+ 
+@@ -56,21 +58,21 @@     return w3.eth.get_logs({"blockHash": block_hash})
+ 
+ 
+-def call_with_override(w3: Web3, tx: dict, state: CallOverride):
++def call_with_override(w3: Web3, tx: dict, state: StateOverride):
+     return w3.eth.call(tx, state_override=state)
+ 
+ 
+ def safe_get_block(w3: Web3, num: int):
+     try:
+         return w3.eth.get_block(num)
+-    except BlockNumberOutofRange:
++    except BlockNumberOutOfRange:
+         return None
+ 
+ 
+ def safe_event_lookup(contract, name: str):
+     try:
+         return getattr(contract.events, name)
+-    except ABIEventFunctionNotFound:
++    except ABIEventNotFound:
+         return None
+ 
+ 
++16 additions, -14 deletions
+✨ Done in 0.015s

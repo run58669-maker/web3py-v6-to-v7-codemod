@@ -3,3 +3,7 @@ node_modules/
 
 # Local-only working files (not for public repo)
 drafts/
+
+# Recorded demo video — distributed via YouTube link in the BUIDL submission,
+# not in the repo. Regenerable via demo/record-demo.ps1 + demo/demo.ps1.
+demo/*.mp4

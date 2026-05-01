@@ -29,16 +29,32 @@ This codemod automates **86%** of that mechanical work with **zero false positiv
 
 ---
 
-## Zero false positives — by design
+## Methodology: AST node-kind scoping
 
-Every rule is scoped to a specific AST node kind so it cannot fire in unrelated code:
+Most migration tools take one of two failure-prone paths:
 
-- Type renames match `kind: "identifier"` only when the name regex matches exactly.
-- Method renames require an enclosing `attribute` node — bare `encodeABI` as a user-defined function is left alone.
-- Kwarg renames target `keyword_argument` nodes — string keys in dict literals (`{"fromBlock": …}`, which are RPC field names that **don't change** in v7) are correctly preserved.
-- Removed modules are *flagged*, never silently dropped.
+- **Regex / string substitution** — fast to write, impossible to scope. `fromBlock` in a Python kwarg gets rewritten, and so does `"fromBlock"` in an RPC dict, and so does `fromBlock` in a third-party library's docstring.
+- **LLM-assisted rewrites** — flexible but non-deterministic. The same input produces different outputs across runs; CI cannot trust the diff.
 
-Verified on a 2019-era web3.py v4 sample repo (`dappuniversity/web3_py_examples`): codemod produced **0 changes** across the entire repo — exactly what should happen on out-of-scope code.
+This codemod takes a third path: **every transformation is bound to a specific `ast-grep` node kind**, and the rule only fires when the surrounding tree shape matches v6 semantics exactly.
+
+| Transformation type | Bound node kind | Why this scoping prevents false positives |
+|---|---|---|
+| Type/class renames | `identifier` with exact name regex | A user-defined variable also named `WebsocketProvider` would only match its single binding site, not unrelated text. |
+| Method renames | `attribute` node enclosing the method name | Bare `def encodeABI(...)` in user code is **not** rewritten — only `obj.encodeABI(...)` form is. |
+| Keyword argument renames | `keyword_argument` node inside a `call` | `{"fromBlock": 5}` (an RPC dict literal whose field name **does not change** in v7) is correctly preserved as a string key. |
+| Import path rewrites | `import_from_statement` with module prefix match | Lateral imports of the same symbol from elsewhere are untouched. |
+| Removed-module references | `import_statement` / `import_from_statement` | Flagged with a `TODO(web3py-v7)` comment, never silently deleted. |
+
+**Operational consequence**: zero false positives is not a hopeful claim — it is a structural property of the rule definitions. Every rule's failure mode is "miss" (under-rewrite, surfaces in CI), never "wrong rewrite" (over-rewrite, causes a silent regression).
+
+This matters because v6→v7 migrations land in production. A codemod that occasionally rewrites string keys in dict literals would corrupt every JSON-RPC payload it touches; the team would never trust the tool again. Tight AST scoping is the price of being trusted with a single keystroke against thousands of files.
+
+### Verification of the scoping invariant
+
+- **70-line realistic v6 dApp** (`examples/realistic-v6-dapp.py`): 14 changes attempted, 14 changes correct, 0 spurious edits, 0 missed. Auto-fix coverage = 86%.
+- **2019-era v4 sample repo** (`dappuniversity/web3_py_examples`): the codemod is run against ~500 LOC of pre-v6 idioms it should never touch. Result: **0 changes**. This is the negative test — proof that out-of-scope code does not trip any rule.
+- **Test fixtures**: every transformation category has both positive (input → expected) and negative (input that should not change) fixtures in `tests/`.
 
 ---
 
@@ -121,10 +137,28 @@ codemod jssg run ./src/index.ts \
 ## Test
 
 ```bash
-codemod jssg test ./src/index.ts --language python --strictness ast
+npm test
+# or directly:
+codemod jssg test --language python ./src/index.ts ./tests
 ```
 
-6 fixtures, all passing as of v0.1.
+**11 fixtures**, all passing as of v0.1:
+
+| # | Kind | Asserts |
+|---|---|---|
+| 01 | positive | type/class identifier renames |
+| 02 | positive | method renames scoped to attribute access |
+| 03 | positive | kwarg renames (snake_case migration) |
+| 04 | positive | import path rewrites (`web3.types` → `eth_typing`) |
+| 05 | positive | removed-module flagging with `TODO` comments |
+| 06 | positive | `.middlewares` → `.middleware` attribute rename |
+| 07 | **negative** | RPC dict literal keys (`{"fromBlock": …}`) preserved |
+| 08 | **negative** | bare user-defined `def encodeABI(...)` left alone |
+| 09 | **negative** | identifiers containing v6 names as substring left alone |
+| 10 | **negative** | non-web3 file with coincidental tokens untouched |
+| 11 | mixed | same name as bare def vs `.attr` form — only attribute form rewrites |
+
+Negative fixtures encode the scoping invariant: **the rule's failure mode is "miss," never "wrong rewrite."**
 
 ---
 

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "codemod jssg test ./src/index.ts --language python --tests-dir ./tests"
+    "test": "codemod jssg test --language python ./src/index.ts ./tests"
   },
   "license": "MIT"
 }

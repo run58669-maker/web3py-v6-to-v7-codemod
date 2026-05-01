@@ -1,0 +1,5 @@
+node_modules/
+.codemod/
+
+# Local-only working files (not for public repo)
+drafts/
